@@ -155,6 +155,38 @@ export const BreathingSessionView: React.FC<BreathingSessionViewProps> = ({
     circleScale = 1.0;
   }
 
+  // Compute SVG parameters for animated circle guide
+  const getPhaseColors = (p: 'inhale' | 'holdIn' | 'exhale' | 'holdOut') => {
+    switch (p) {
+      case 'inhale':
+        return { start: '#38bdf8', end: '#10b981', main: '#38bdf8', glow: 'rgba(56, 189, 248, 0.4)' };
+      case 'holdIn':
+        return { start: '#a855f7', end: '#6366f1', main: '#a855f7', glow: 'rgba(168, 85, 247, 0.4)' };
+      case 'exhale':
+        return { start: '#10b981', end: '#14b8a6', main: '#10b981', glow: 'rgba(16, 185, 129, 0.4)' };
+      case 'holdOut':
+        return { start: '#f59e0b', end: '#d97706', main: '#f59e0b', glow: 'rgba(245, 158, 11, 0.4)' };
+    }
+  };
+
+  const theme = getPhaseColors(phase);
+
+  const minSvgRadius = 42;
+  const maxSvgRadius = 108;
+  let svgRadius = minSvgRadius;
+  if (phase === 'inhale') {
+    svgRadius = minSvgRadius + (maxSvgRadius - minSvgRadius) * phaseProgress;
+  } else if (phase === 'holdIn') {
+    svgRadius = maxSvgRadius;
+  } else if (phase === 'exhale') {
+    svgRadius = maxSvgRadius - (maxSvgRadius - minSvgRadius) * phaseProgress;
+  } else {
+    svgRadius = minSvgRadius;
+  }
+
+  const guideCircumference = 2 * Math.PI * 120; // ~753.98
+  const strokeOffset = guideCircumference * (1 - phaseProgress);
+
   const phaseLabelMap = {
     inhale: 'INHALAR',
     holdIn: 'RETENER',
@@ -278,28 +310,119 @@ export const BreathingSessionView: React.FC<BreathingSessionViewProps> = ({
           {(elapsedSeconds % 60).toString().padStart(2, '0')}
         </div>
 
-        {/* Central Animated Breathing Canvas / Circle Element */}
-        <div className="relative flex items-center justify-center my-8">
-          {/* Outer Guide Ring */}
-          <div className="w-64 h-64 border-2 border-slate-800/80 rounded-full flex items-center justify-center relative">
-            {/* Inner Scaling Breathing Orb */}
-            <div
-              className={`w-32 h-32 rounded-full flex items-center justify-center shadow-2xl transition-transform duration-75 ${
-                visualMode === 'circulos' ? 'bg-gradient-to-br from-sky-500/80 to-emerald-500/80' :
-                visualMode === 'ondas' ? 'bg-gradient-to-tr from-teal-500/80 to-indigo-500/80 rounded-3xl animate-spin-slow' :
-                visualMode === 'gradientes' ? 'bg-gradient-to-r from-purple-500/80 to-pink-500/80' :
-                'bg-sky-400 shadow-sky-500/50'
-              }`}
-              style={{
-                transform: `scale(${circleScale})`,
-                boxShadow: `0 0 ${circleScale * 25}px rgba(56, 189, 248, 0.4)`
-              }}
+        {/* Central Animated Breathing Canvas / SVG Pacing Guide Circle */}
+        <div className="relative flex items-center justify-center my-6">
+          <svg viewBox="0 0 300 300" className="w-72 h-72 sm:w-80 sm:h-80 select-none overflow-visible">
+            <defs>
+              {/* Main Phase Gradient */}
+              <linearGradient id="breathPhaseGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor={theme.start} />
+                <stop offset="100%" stopColor={theme.end} />
+              </linearGradient>
+
+              {/* Glowing Radial Fill */}
+              <radialGradient id="breathOrbRadial" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor={theme.start} stopOpacity="0.85" />
+                <stop offset="70%" stopColor={theme.end} stopOpacity="0.5" />
+                <stop offset="100%" stopColor={theme.end} stopOpacity="0.1" />
+              </radialGradient>
+
+              {/* Subtle Neon Drop Shadow Filter */}
+              <filter id="svgGlowFilter" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="6" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+
+            {/* Static Max Expansion Guide Track Ring */}
+            <circle
+              cx="150"
+              cy="150"
+              r="120"
+              fill="none"
+              stroke="#1e293b"
+              strokeWidth="2"
+              strokeDasharray="4 6"
+            />
+
+            {/* Cardinal Direction Tick Marks on Guide Ring */}
+            {[0, 90, 180, 270].map((angle, idx) => (
+              <line
+                key={idx}
+                x1={150 + 114 * Math.cos((angle * Math.PI) / 180)}
+                y1={150 + 114 * Math.sin((angle * Math.PI) / 180)}
+                x2={150 + 126 * Math.cos((angle * Math.PI) / 180)}
+                y2={150 + 126 * Math.sin((angle * Math.PI) / 180)}
+                stroke="#334155"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            ))}
+
+            {/* Phase Progress Arc Overlay around Guide Ring */}
+            <circle
+              cx="150"
+              cy="150"
+              r="120"
+              fill="none"
+              stroke="url(#breathPhaseGrad)"
+              strokeWidth="4"
+              strokeDasharray={guideCircumference}
+              strokeDashoffset={strokeOffset}
+              strokeLinecap="round"
+              transform="rotate(-90 150 150)"
+              className="transition-[stroke-dashoffset] duration-75"
+            />
+
+            {/* Expanding/Contracting SVG Outer Wave Ripple */}
+            <circle
+              cx="150"
+              cy="150"
+              r={Math.min(130, svgRadius + 16)}
+              fill="none"
+              stroke={theme.start}
+              strokeWidth="1.5"
+              opacity={0.35}
+              strokeDasharray="6 6"
+            />
+
+            {/* Main Expanding and Contracting Animated SVG Circle */}
+            <circle
+              cx="150"
+              cy="150"
+              r={svgRadius}
+              fill="url(#breathOrbRadial)"
+              stroke="url(#breathPhaseGrad)"
+              strokeWidth="3.5"
+              filter="url(#svgGlowFilter)"
+              className="transition-[r] duration-75 ease-linear"
+            />
+
+            {/* Center Phase Text in SVG */}
+            <text
+              x="150"
+              y="146"
+              textAnchor="middle"
+              dominantBaseline="middle"
+              className="fill-white font-extrabold text-sm uppercase tracking-widest select-none pointer-events-none drop-shadow-md"
             >
-              <span className="text-white font-extrabold text-sm uppercase tracking-widest drop-shadow-md">
-                {phaseLabelMap[phase]}
-              </span>
-            </div>
-          </div>
+              {phaseLabelMap[phase]}
+            </text>
+
+            {/* Center Subtext / Countdown inside Circle */}
+            <text
+              x="150"
+              y="166"
+              textAnchor="middle"
+              dominantBaseline="middle"
+              className="fill-slate-200 font-mono font-bold text-xs select-none pointer-events-none"
+            >
+              {Math.ceil(getPhaseDuration(phase) * (1 - phaseProgress))}s
+            </text>
+          </svg>
         </div>
 
         {/* Phase Duration Countdown Indicator */}
