@@ -81,7 +81,7 @@ export default function App() {
         <SidebarNav activeTab={activeTab} onSelectTab={(tab) => setActiveTab(tab)} />
 
         {/* View Content Area */}
-        <main className="flex-1 bg-slate-950 min-w-0 pb-12">
+        <main className="flex-1 bg-slate-950 min-w-0 pb-24 lg:pb-12">
           {activeTab === 'dashboard' && (
             <DashboardView
               profile={profile}
